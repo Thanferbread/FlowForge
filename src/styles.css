@@ -48,6 +48,8 @@ body {
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+  width: 100%;
+  min-width: 0;
 }
 
 .app-header {
@@ -78,6 +80,8 @@ body {
   display: flex;
   flex: 1;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
 }
 
 /* 左侧工具栏 */
@@ -181,6 +185,7 @@ body {
 .canvas-area {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--color-bg);
@@ -223,11 +228,41 @@ body {
   background: var(--color-primary-light);
 }
 
+.canvas-toolbar button:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
+.canvas-toolbar button[aria-pressed="true"] {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  color: var(--color-primary-dark);
+}
+
 .canvas-wrapper {
   flex: 1;
+  min-width: 0;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
   position: relative;
+  display: flex;
+  padding: 12px;
+  overscroll-behavior: contain;
+}
+
+.canvas-stage {
+  position: relative;
+  flex: 0 0 auto;
+  margin: auto;
+}
+
+.canvas-coordinates {
+  display: flex;
+  justify-content: space-between;
+  height: 20px;
+  padding: 3px 3px 0;
+  color: #6b7a8a;
+  font: 11px Consolas, monospace;
 }
 
 .canvas-wrapper canvas {
@@ -728,14 +763,16 @@ select:focus-visible, summary:focus-visible { outline: 3px solid #bd8b3e; outlin
   .workspace-note b { display: none; }
   .workspace-note > span { max-width: 75%; font-size: 9px; }
   .app-body { display: flex; flex-direction: column; padding: 8px; gap: 8px; }
-  .toolbar { width: 100%; max-height: 235px; display: flex; flex-wrap: wrap; gap: 5px; padding: 12px; }
-  .toolbar h2 { width: 100%; margin: 13px 0 3px; padding-bottom: 5px; }
-  .tool-btn { width: auto; margin-bottom: 0; padding: 7px 9px; }
-  .toolbar .action-btn { width: auto; margin-bottom: 0; padding: 7px 9px; }
-  .toolbar .sim-params { display: flex; flex-wrap: wrap; gap: 8px; }
-  .toolbar .prop-row { width: 128px; }
-  .canvas-area { flex: auto; min-height: 480px; }
+  .toolbar { width: 100%; max-height: 270px; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-content: start; gap: 6px; padding: 12px; }
+  .toolbar h2 { grid-column: 1 / -1; width: 100%; margin: 8px 0 2px; padding-bottom: 5px; }
+  .tool-btn { width: 100%; min-height: 42px; margin-bottom: 0; padding: 8px 9px; }
+  .toolbar .action-btn { width: 100%; min-height: 42px; margin-bottom: 0; padding: 8px 9px; }
+  .toolbar .sim-params { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+  .toolbar .prop-row { width: auto; min-width: 0; flex-wrap: wrap; gap: 4px; }
+  .toolbar .prop-row input, .toolbar .prop-row select { width: 100%; min-width: 0; min-height: 36px; }
+  .canvas-area { flex: none; height: calc((100vw - 42px) * .6875 + 130px); min-height: 315px; max-height: 460px; }
   .canvas-toolbar { padding: 8px; gap: 6px; }
+  .canvas-toolbar button { min-height: 36px; }
   .canvas-toolbar .coord { width: 100%; margin-left: 0; }
   .side-panel { width: 100%; max-height: none; }
   .analysis-panel { padding: 22px 14px; }

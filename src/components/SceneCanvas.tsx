@@ -9,7 +9,7 @@
  * - 不同对象用形状 + 颜色区分（不只靠颜色）。
  * - 人员层使用 requestAnimationFrame 在相邻格心间插值，不推进模型。
  */
-import { useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react';
+import { useRef, useLayoutEffect, useState, useCallback } from 'react';
 import type { Scene, GridPos } from '../domain/types';
 import type { Tool } from '../App';
 import type { AgentView, UiRunState } from '../simulation/types';
@@ -39,8 +39,13 @@ interface SceneCanvasProps {
 }
 
 const BASE_CELL = 26;
-const MIN_ZOOM = 0.4;
+// Eight CSS pixels keeps the default 32-column map visible on a 320px phone.
+// Never shrink further: entrance symbols need a positive drawing radius.
+const MIN_CELL = 8;
+const MIN_ZOOM = MIN_CELL / BASE_CELL;
 const MAX_ZOOM = 3;
+const VIEW_PADDING = 24;
+const COORD_HEIGHT = 20;
 
 function sizeCanvas(canvas: HTMLCanvasElement, cssW: number, cssH: number, dpr: number) {
   if (canvas.style.width !== `${cssW}px`) canvas.style.width = `${cssW}px`;
@@ -95,10 +100,31 @@ export function SceneCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const agentCanvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const activePointerRef = useRef<number | null>(null);
+  const pointerEventsSeenRef = useRef(false);
+  const panStartRef = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
   const [hoverPos, setHoverPos] = useState<GridPos | null>(null);
   const [dragState, setDragState] = useState<{ start: GridPos; current: GridPos } | null>(null);
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const [fitView, setFitView] = useState(true);
+  const [panView, setPanView] = useState(false);
+  const [panning, setPanning] = useState(false);
 
-  const cellSize = Math.round(BASE_CELL * zoom);
+  const requestedCellSize = Math.max(MIN_CELL, Math.min(BASE_CELL * MAX_ZOOM, Math.round(BASE_CELL * zoom)));
+  const fittedCellSize = viewport.width > 0 && viewport.height > 0
+    ? Math.max(MIN_CELL, Math.min(BASE_CELL * MAX_ZOOM, Math.floor(Math.min(
+      (viewport.width - VIEW_PADDING) / scene.width,
+      (viewport.height - VIEW_PADDING - COORD_HEIGHT) / scene.height,
+    ))))
+    : requestedCellSize;
+  const cellSize = fitView ? fittedCellSize : requestedCellSize;
+  const viewZoom = cellSize / BASE_CELL;
+  const changeZoom = (next: number) => {
+    setFitView(false);
+    onZoomChange(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(next * 100) / 100)));
+  };
+
+  useLayoutEffect(() => { setFitView(true); }, [scene.width, scene.height]);
 
   const animStateRef = useRef<AnimState>({
     prevAgents: [],
@@ -136,25 +162,19 @@ export function SceneCanvas({
   /** 绘制静态场景底图（不含人员） */
   const drawStatic = useCallback(() => {
     const canvas = canvasRef.current;
-    const wrapper = wrapperRef.current;
-    if (!canvas || !wrapper) return;
+    if (!canvas) return;
 
     const dpr = window.devicePixelRatio || 1;
     const cssW = scene.width * cellSize;
     const cssH = scene.height * cellSize;
-    const wrapW = wrapper.clientWidth;
-    const wrapH = wrapper.clientHeight;
-
-    const canvasCssW = Math.max(cssW, wrapW);
-    const canvasCssH = Math.max(cssH, wrapH);
-    sizeCanvas(canvas, canvasCssW, canvasCssH, dpr);
+    // Only the map determines the backing store. A viewport-sized in-flow
+    // canvas can feed its previous width back into a flex/grid container.
+    sizeCanvas(canvas, cssW, cssH, dpr);
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    ctx.fillStyle = '#f7f9fb';
-    ctx.fillRect(0, 0, canvasCssW, canvasCssH);
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, cssW, cssH);
 
@@ -233,32 +253,22 @@ export function SceneCanvas({
       }
     }
 
-    ctx.fillStyle = '#6b7a8a';
-    ctx.font = '11px Consolas, monospace';
-    ctx.fillText(`0,0`, 4, cssH + 14);
-    ctx.fillText(`${scene.width - 1},${scene.height - 1}`, cssW - 50, cssH + 14);
   }, [scene, cellSize, selectedBoothId, hoverPos, dragState, tool, heatmap, showHeatmap]);
 
   /** 绘制人员层到 agentCanvas */
   const drawAgents = useCallback((displays: AgentDisplay[]) => {
     const canvas = agentCanvasRef.current;
-    const wrapper = wrapperRef.current;
-    if (!canvas || !wrapper) return;
+    if (!canvas) return;
 
     const dpr = window.devicePixelRatio || 1;
     const cssW = scene.width * cellSize;
     const cssH = scene.height * cellSize;
-    const wrapW = wrapper.clientWidth;
-    const wrapH = wrapper.clientHeight;
-    const canvasCssW = Math.max(cssW, wrapW);
-    const canvasCssH = Math.max(cssH, wrapH);
-
-    sizeCanvas(canvas, canvasCssW, canvasCssH, dpr);
+    sizeCanvas(canvas, cssW, cssH, dpr);
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, canvasCssW, canvasCssH);
+    ctx.clearRect(0, 0, cssW, cssH);
 
     for (const a of displays) {
       drawAgent(ctx, a.displayPos.x * cellSize, a.displayPos.y * cellSize, cellSize, a.state, a.id);
@@ -369,8 +379,18 @@ export function SceneCanvas({
     redrawCurrent();
   }, [drawStatic, drawAgents, redrawCurrent]);
 
-  useEffect(() => {
-    const redraw = () => { drawStaticRef.current(); redrawCurrent(); };
+  useLayoutEffect(() => {
+    const redraw = () => {
+      const wrapper = wrapperRef.current;
+      if (wrapper) {
+        const width = wrapper.clientWidth;
+        const height = wrapper.clientHeight;
+        setViewport((previous) => previous.width === width && previous.height === height ? previous : { width, height });
+      }
+      drawStaticRef.current();
+      redrawCurrent();
+    };
+    redraw();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(redraw);
     if (wrapperRef.current) observer?.observe(wrapperRef.current);
     window.addEventListener('resize', redraw);
@@ -449,33 +469,85 @@ export function SceneCanvas({
     setHoverPos(null);
   }, []);
 
+  // Capture one primary pointer so a finger can finish a booth drag outside
+  // the map. Panning is explicit: scrolling the viewport must never edit cells.
+  const releasePointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (activePointerRef.current !== e.pointerId) return;
+    activePointerRef.current = null;
+    panStartRef.current = null;
+    setPanning(false);
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    pointerEventsSeenRef.current = true;
+    if (!e.isPrimary || e.button !== 0 || activePointerRef.current !== null) return;
+    e.preventDefault();
+    activePointerRef.current = e.pointerId;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    if (panView) {
+      const wrapper = wrapperRef.current;
+      if (wrapper) panStartRef.current = { x: e.clientX, y: e.clientY, left: wrapper.scrollLeft, top: wrapper.scrollTop };
+      setPanning(true);
+    } else handleMouseDown(e);
+  };
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (activePointerRef.current !== null && activePointerRef.current !== e.pointerId) return;
+    const start = panStartRef.current;
+    const wrapper = wrapperRef.current;
+    if (start && wrapper) {
+      wrapper.scrollLeft = start.left + start.x - e.clientX;
+      wrapper.scrollTop = start.top + start.y - e.clientY;
+    } else if (!panView) handleMouseMove(e);
+  };
+  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (activePointerRef.current !== e.pointerId) return;
+    if (!panStartRef.current) handleMouseUp(e);
+    releasePointer(e);
+  };
+  const handlePointerCancel = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (activePointerRef.current !== e.pointerId) return;
+    setDragState(null);
+    setHoverPos(null);
+    releasePointer(e);
+  };
+
   /** 滚轮缩放 */
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom + delta));
-      onZoomChange(Math.round(newZoom * 10) / 10);
+      setFitView(false);
+      const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, viewZoom + delta));
+      onZoomChange(Math.round(newZoom * 100) / 100);
     },
-    [zoom, onZoomChange],
+    [viewZoom, onZoomChange],
   );
 
-  const cursor = tool === 'select' ? 'pointer' : tool === 'erase' ? 'not-allowed' : 'crosshair';
+  const cursor = panView ? (panning ? 'grabbing' : 'grab') : tool === 'select' ? 'pointer' : tool === 'erase' ? 'not-allowed' : 'crosshair';
 
   return (
     <div className="canvas-area">
       <div className="canvas-toolbar">
         <div className="zoom-control">
-          <button onClick={() => onZoomChange(Math.max(MIN_ZOOM, Math.round((zoom - 0.2) * 10) / 10))} aria-label="缩小">
+          <button onClick={() => changeZoom(viewZoom - 0.2)} aria-label="缩小" disabled={cellSize <= MIN_CELL}>
             －
           </button>
           <span style={{ fontSize: 13, minWidth: 48, textAlign: 'center' }}>
-            {Math.round(zoom * 100)}%
+            {Math.round(viewZoom * 100)}%
           </span>
-          <button onClick={() => onZoomChange(Math.min(MAX_ZOOM, Math.round((zoom + 0.2) * 10) / 10))} aria-label="放大">
+          <button onClick={() => changeZoom(viewZoom + 0.2)} aria-label="放大" disabled={cellSize >= BASE_CELL * MAX_ZOOM}>
             ＋
           </button>
-          <button onClick={onResetView}>重置视图</button>
+          <button onClick={() => {
+            setFitView(true);
+            wrapperRef.current?.scrollTo?.(0, 0);
+            onResetView();
+          }}>重置视图</button>
+          <button aria-label="切换画布平移" aria-pressed={panView} title="开启后拖动画布；关闭后编辑网格" onClick={() => {
+            setPanView((previous) => !previous);
+            setDragState(null);
+            setHoverPos(null);
+          }}>平移</button>
         </div>
         <span style={{ fontSize: 13, color: '#6b7a8a' }}>
           工具：{toolLabel(tool)}　地图：{scene.width}×{scene.height}
@@ -484,20 +556,30 @@ export function SceneCanvas({
           {hoverPos ? `坐标 (${hoverPos.x}, ${hoverPos.y})` : '坐标 —'}
         </span>
       </div>
-      <div className="canvas-wrapper" ref={wrapperRef} style={{ position: 'relative' }}>
+      <div className="canvas-wrapper" ref={wrapperRef}>
+        <div className="canvas-stage" style={{ width: scene.width * cellSize, height: scene.height * cellSize + COORD_HEIGHT }}>
         <canvas
           ref={canvasRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+          onLostPointerCapture={handlePointerCancel}
+          onMouseDown={(e) => { if (!pointerEventsSeenRef.current && !panView) handleMouseDown(e); }}
+          onMouseMove={(e) => { if (!pointerEventsSeenRef.current && !panView) handleMouseMove(e); }}
+          onMouseUp={(e) => { if (!pointerEventsSeenRef.current && !panView) handleMouseUp(e); }}
           onMouseLeave={handleMouseLeave}
           onWheel={handleWheel}
-          style={{ cursor }}
+          style={{ cursor, touchAction: 'none' }}
         />
         <canvas
           ref={agentCanvasRef}
           style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
         />
+          <div className="canvas-coordinates" aria-hidden="true">
+            <span>0,0</span><span>{scene.width - 1},{scene.height - 1}</span>
+          </div>
+        </div>
       </div>
     </div>
   );

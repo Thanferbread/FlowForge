@@ -653,7 +653,7 @@ export function App() {
       <section className="workspace-overview" aria-label="运行概览">
         <AnniversaryArtwork />
         <div className="workspace-title">
-          <span className="workspace-eyebrow">理行120 <i /> 上理建校120周年 · 学生作品</span>
+          <span className="workspace-eyebrow">上理生日派队 <i /> 上理建校120周年 · 学生作品</span>
           <h2>校园活动空间规划</h2>
           <p>为校庆集市、校园展览与招聘会，提前看见人流。</p>
           <div className="overview-actions">
