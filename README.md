@@ -1,10 +1,10 @@
 # FlowForge 校园人流实验室
 
-面向招聘会、展览和校园活动的场景编辑、人流仿真与布局实验工具。团队：理行120；成员：裴家庆；公开昵称：Blu3_；版本：1.0。
+面向招聘会、展览和校园活动的场景编辑、人流仿真与布局实验工具。团队：理行120；成员：裴家庆；公开昵称：Blu3__；版本：1.0。
 
 ![FlowForge 校庆版实际运行界面](docs/images/flowforge-anniversary.jpg)
 
-源码仓库：https://atomgit.com/lOveZhao/FlowForge 。默认发布分支：`main`。
+源码仓库：https://atomgit.com/Blu3__/FlowForge 。默认发布分支：`main`。
 
 2026-10-27校庆版：主应用与展览页采用上理120周年主题的红金暖白配色，加入原创环形轨迹和校园建筑意象。最新运行截图与响应式检查见 `evidence/08_anniversary/`，交付ZIP以“校庆版”单独命名。
 

@@ -2,7 +2,7 @@
 
 官方指南：https://gallery.developer.huaweicloud.com/gallery/submit-guide
 
-本项目仓库：`https://atomgit.com/lOveZhao/FlowForge.git`。准备发布分支：`main`。
+本项目仓库：`https://atomgit.com/Blu3__/FlowForge.git`。准备发布分支：`main`。
 
 1. 在已注册的 GitCode 账号中新建公开空仓库，名称建议 `flowforge`。保存页面给出的 HTTPS 仓库地址；有默认分支时同时记录实际分支名。
 2. 将现有校庆版源码推入该仓库。根目录应含 `package.json`、`README.md` 和 `src/`；本地 `.gitignore` 已排除依赖、构建结果、交付包、临时材料与原始截图。提交前检查暂存清单。
