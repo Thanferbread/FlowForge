@@ -1,0 +1,47 @@
+# Application build and local dependencies
+node_modules/
+dist/
+coverage/
+.vite/
+.cache/
+*.tsbuildinfo
+
+# Credentials and machine local files
+.env
+.env.*
+!.env.example
+*.local
+
+# Public source repository: local materials are submitted separately.
+/evidence/
+/submission/
+/tmp/
+/screenshots/
+/PLAN_TXT/
+/.codeartsdoer/
+/runs/
+
+# The public repository keeps application scripts; material tooling stays local.
+/scripts/*
+!/scripts/build-offline.mjs
+!/scripts/serve-dist.mjs
+!/scripts/run-simulation.test.mjs
+!/scripts/optimization-experiment.test.mjs
+
+# Publish current documentation; keep detailed review drafts in the local archive.
+/docs/*
+!/docs/ARCHITECTURE.md
+!/docs/CONTRIBUTIONS.md
+!/docs/DEVELOPMENT.md
+!/docs/PROJECT_STATUS.md
+!/docs/PUBLISH_STEPS.md
+!/docs/images/
+
+# Python and operating-system caches
+__pycache__/
+*.py[cod]
+Thumbs.db
+.DS_Store
+
+# Office lock files
+~$*
