@@ -36,6 +36,7 @@ import { DEFAULT_SEED, DEFAULT_H, DEFAULT_DEMAND_COUNT, MIN_H, MAX_H, MAX_DEMAND
 import { optimizeLayout } from './optimization';
 import type { OptimizationResult, OptimizationProgress } from './optimization/types';
 import { AnalysisPanel } from './components/AnalysisPanel';
+import { MetricHelp } from './components/MetricHelp';
 
 /** 编辑工具 */
 export type Tool = 'select' | 'obstacle' | 'erase' | 'entrance' | 'exit' | 'booth';
@@ -654,8 +655,9 @@ export function App() {
         <AnniversaryArtwork />
         <div className="workspace-title">
           <span className="workspace-eyebrow">上理生日派队 <i /> 上理建校120周年 · 学生作品</span>
-          <h2>校园活动空间规划</h2>
-          <p>为校庆集市、校园展览与招聘会，提前看见人流。</p>
+          <h2><span>校庆集市怎么摆，</span><span>才更顺？</span></h2>
+          <p>先在屏幕上试摆，再为现场选方案。</p>
+          <p className="overview-invitation">从 6 个摊位、180 位访客的假设示例开始。</p>
           <div className="overview-actions">
             <button onClick={handleDemo}><span>一键运行示例</span> <span className="overview-start-icon" aria-hidden="true">↗</span></button>
             <button onClick={handleOptimize} disabled={optimizing || !validation.readyForSimulation}>搜索更好布局</button>
@@ -664,14 +666,30 @@ export function App() {
         </div>
         <div className="overview-metrics">
           <p className="overview-caption">运行观测 <span>LIVE OBSERVATION</span></p>
-          <div><span>服务完成</span><strong>{simMetrics ? <>{simMetrics.serviceCompleted}<small> / {simMetrics.demandCount}</small></> : '—'}</strong></div>
-          <div><span>系统完成率</span><strong>{simMetrics?.systemCompletionRate === null || !simMetrics ? '—' : `${(simMetrics.systemCompletionRate * 100).toFixed(1)}%`}</strong></div>
-          <div><span>等待均值</span><strong>{simMetrics?.waitAverage == null ? '—' : `${simMetrics.waitAverage.toFixed(1)} s`}</strong></div>
-          <div><span>仿真进度</span><strong>{simSnapshot?.tick ?? 0}<small> / {simConfig.H}</small></strong></div>
+          <MetricHelp metric="serviceCompleted" variant="overview"><strong>{simMetrics ? <>{simMetrics.serviceCompleted}<small> / {simMetrics.demandCount}</small></> : '—'}</strong></MetricHelp>
+          <MetricHelp metric="systemCompletionRate" variant="overview"><strong>{simMetrics?.systemCompletionRate === null || !simMetrics ? '—' : `${(simMetrics.systemCompletionRate * 100).toFixed(1)}%`}</strong></MetricHelp>
+          <MetricHelp metric="waitAverage" variant="overview"><strong>{simMetrics?.waitAverage == null ? '—' : `${simMetrics.waitAverage.toFixed(1)} s`}</strong></MetricHelp>
+          <MetricHelp metric="progress" variant="overview"><strong>{simSnapshot?.tick ?? 0}<small> / {simConfig.H}</small></strong></MetricHelp>
+          <footer className="overview-support">
+            <a href="https://gallery.developer.huaweicloud.com/gallery/007027b697800000" target="_blank" rel="noopener noreferrer">作品详情 <span aria-hidden="true">↗</span></a>
+          </footer>
         </div>
       </section>
       {optimizing && <div className="search-progress" role="status"><span>正在进行配对布局搜索{optimizationProgress ? ` · ${optimizationProgress.completedRuns}/${optimizationProgress.maxRuns} 次运行 · seed ${optimizationProgress.seed} · T${optimizationProgress.currentTick}` : ''}</span><button onClick={() => optimizationController.current?.abort()}>停止搜索</button></div>}
-      <div className="workspace-note"><span><b>场地实验</b>{showHeatmap ? '热力图：累计占用频次 / 采样次数 / 格面积；各图使用一致标尺' : '动画为显示插值，指标按已提交的离散时间步统计'}</span><button onClick={() => setShowHeatmap((value) => !value)} aria-pressed={showHeatmap}>{showHeatmap ? '隐藏热图' : '显示热图'}</button></div>
+      <div className="workspace-help">
+      <details className="experience-guide">
+        <summary><span>第一次来？3 步体验</span><span className="guide-question">{showHeatmap ? '热图越深，平均占用越高。' : '挪一个摊位，排队会更短吗？'}</span><span className="guide-disclosure" aria-hidden="true">＋</span></summary>
+        <div className="guide-content">
+          <ol className="experience-steps">
+            <li><span className="step-number">01</span><div><h3>跑一场活动</h3><p>载入 6 个展位的招聘会示例，看访客如何入场、排队和离开。</p></div><button onClick={handleDemo}>开始示例</button></li>
+            <li><span className="step-number">02</span><div><h3>找到忙碌的位置</h3><p>运行后看热图：颜色越深，平均占用越高；再结合等待与完成率判断。</p></div><button onClick={() => setShowHeatmap(true)}>打开热图</button></li>
+            <li><span className="step-number">03</span><div><h3>用同一批需求比方案</h3><p>搜索展位的小范围平移。固定访客需求比较，再换一组复验；没改善就保留原布局。</p></div><button onClick={handleOptimize} disabled={optimizing || !validation.readyForSimulation}>比较布局</button></li>
+          </ol>
+          <div className="guide-footnote"><p>也可以按自己的活动编辑出入口、障碍与展位。修改场地前，先导出当前场景和报告。</p><p>这是布局实验工具，示例并非校庆实测数据。</p></div>
+        </div>
+      </details>
+      <button className="workspace-heatmap" onClick={() => setShowHeatmap((value) => !value)} aria-pressed={showHeatmap}>{showHeatmap ? '隐藏热图' : '显示热图'}</button>
+      </div>
       <div className="app-body">
         <Toolbar
           tool={tool}
